@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Classement pilotes F1 – Live</title>
+<style>
+:root{--bg:#f5f5f7;--card:#fff;--tx:#15151e;--mut:#6b6b78;--line:#e4e4ea;--acc:#e10600}
+@media (prefers-color-scheme:dark){:root{--bg:#111116;--card:#1b1b23;--tx:#f2f2f5;--mut:#9a9aa8;--line:#2a2a35}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;max-width:640px;margin-inline:auto;padding:16px}
+h1{font-size:22px;margin:4px 0 2px}h1 span{color:var(--acc)}
+.sub{color:var(--mut);font-size:13px;margin:0 0 14px}
+.next{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:13px;margin-bottom:12px;display:flex;justify-content:space-between;gap:8px}
+.next b{color:var(--acc)}
+input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--tx);font-size:15px;margin-bottom:12px}
+.row{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px}
+.pos{font-weight:700;text-align:center}
+.name{font-weight:600;display:flex;align-items:center;gap:6px}
+.dot{width:10px;height:10px;border-radius:50%;flex:none}
+.team{color:var(--mut);font-size:12px}
+.bar{height:4px;border-radius:2px;background:var(--line);margin-top:6px;overflow:hidden}
+.bar i{display:block;height:100%}
+.pts{text-align:right;font-weight:700;font-size:18px}
+.gap{color:var(--mut);font-size:11px;font-weight:400;display:block}
+.msg{color:var(--mut);text-align:center;padding:20px;font-size:14px}
+.foot{color:var(--mut);font-size:12px;text-align:center;margin-top:14px}
+button{background:none;border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:6px 12px;cursor:pointer}
+</style>
+</head>
+<body>
+<h1>🏁 Classement pilotes <span>F1</span></h1>
+<p class="sub" id="sub">Chargement…</p>
+<div class="next"><span>Prochain GP : <b id="nx">–</b></span><span id="nd"></span></div>
+<input id="q" type="search" placeholder="Rechercher un pilote ou une écurie…">
+<div id="list"><p class="msg">Chargement du classement…</p></div>
+<p class="foot"><span id="upd"></span> <button id="rf">Actualiser</button></p>
+<script>
+const API="https://api.jolpi.ca/ergast/f1/current";
+const COL={mercedes:"#27f4d2",ferrari:"#e8002d",mclaren:"#ff8000","red bull":"#3671c6","racing bulls":"#6692ff",rb:"#6692ff",alpine:"#ff87bc",haas:"#b6babd",audi:"#c0392b",sauber:"#c0392b","aston martin":"#229971",williams:"#64c4ff",cadillac:"#8a8a99"};
+const color=n=>{n=(n||"").toLowerCase();for(const k in COL)if(n.includes(k))return COL[k];return"#888"};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let drivers=[];
+const $=id=>document.getElementById(id);
+
+function render(){
+  const t=$("q").value.toLowerCase().trim();
+  if(!drivers.length)return;
+  const max=Math.max(...drivers.map(d=>d.pts),1),lead=drivers[0].pts;
+  $("list").innerHTML=drivers.map(d=>{
+    if(t&&!(d.name+" "+d.team).toLowerCase().includes(t))return"";
+    const c=color(d.team),gap=d.pos===1?"Leader":"−"+(lead-d.pts)+" pts";
+    return `<div class="row"><div class="pos">${esc(d.pos)}</div><div><div class="name"><span class="dot" style="background:${c}"></span>${esc(d.name)}</div><div class="team">${esc(d.team)}</div><div class="bar"><i style="width:${d.pts/max*100}%;background:${c}"></i></div></div><div class="pts">${esc(d.pts)}<span class="gap">${gap}</span></div></div>`;
+  }).join("")||'<p class="msg">Aucun résultat.</p>';
+}
+
+async function load(){
+  try{
+    const [s,n]=await Promise.all([
+      fetch(API+"/driverStandings.json").then(r=>r.json()),
+      fetch(API+"/next.json").then(r=>r.json()).catch(()=>null)
+    ]);
+    const list=s.MRData.StandingsTable.StandingsLists[0];
+    drivers=list.DriverStandings.map(d=>({
+      pos:d.position,pts:Number(d.points),
+      name:d.Driver.givenName+" "+d.Driver.familyName,
+      team:(d.Constructors[d.Constructors.length-1]||{}).name||""
+    }));
+    $("sub").textContent="Saison "+list.season+" · après la manche "+list.round;
+    const race=n&&n.MRData.RaceTable.Races[0];
+    if(race){
+      $("nx").textContent=race.raceName;
+      $("nd").textContent=new Date(race.date).toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"});
+    }else{$("nx").textContent="–";$("nd").textContent=""}
+    $("upd").textContent="Mis à jour à "+new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+    render();
+  }catch(e){
+    if(!drivers.length)$("list").innerHTML='<p class="msg">Impossible de charger les données. Vérifie ta connexion puis appuie sur « Actualiser ».</p>';
+    $("upd").textContent="Échec de la mise à jour.";
+  }
+}
+$("q").addEventListener("input",render);
+$("rf").addEventListener("click",load);
+load();
+setInterval(load,10*60*1000); // rafraîchissement automatique toutes les 10 min
+</script>
+</body>
+</html>
