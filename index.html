@@ -70,4 +70,32 @@ const COL={"Mercedes":"#27f4d2","Ferrari":"#e8002d","McLaren":"#ff8000","Red Bul
 document.getElementById("sub").textContent="Après la manche "+DATA.round+"/"+DATA.total+" · "+DATA.after+" · "+DATA.date;
 document.getElementById("nx").textContent=DATA.next;
 document.getElementById("nd").textContent=DATA.nextDate;
-const
+const max=DATA.drivers[0][2];
+function render(f){
+  const t=(f||"").toLowerCase();
+  document.getElementById("list").innerHTML=DATA.drivers.map((d,i)=>{
+    if(t&&!(d[0]+" "+d[1]).toLowerCase().includes(t))return"";
+    const c=COL[d[1]]||"#888",gap=i?"−"+(max-d[2])+" pts":"Leader";
+    return `<div class="row"><div class="pos">${i+1}</div><div><div class="name"><span class="dot" style="background:${c}"></span>${d[0]}</div><div class="team">${d[1]}</div><div class="bar"><i style="width:${d[2]/max*100}%;background:${c}"></i></div></div><div class="pts">${d[2]}<span class="gap">${gap}</span></div></div>`;
+  }).join("");
+}
+document.getElementById("q").addEventListener("input",e=>render(e.target.value));
+render();
+const RACES=[
+["Australie","8 mars","George Russell","Mercedes"],["Chine","15 mars","Kimi Antonelli","Mercedes"],
+["Japon","29 mars","Kimi Antonelli","Mercedes"],["Miami","3 mai","Kimi Antonelli","Mercedes"],
+["Canada","24 mai","Kimi Antonelli","Mercedes"],["Monaco","7 juin","Kimi Antonelli","Mercedes"],
+["Barcelone-Catalogne","14 juin","Lewis Hamilton","Ferrari"],["Autriche","28 juin","George Russell","Mercedes"],
+["Grande-Bretagne","5 juil.","Charles Leclerc","Ferrari"],["Belgique","19 juil.","Kimi Antonelli","Mercedes"],
+["Hongrie","26 juil.","Lando Norris","McLaren"],["Pays-Bas","23 août","Lando Norris","McLaren"],
+["Italie","6 sept.","Kimi Antonelli","Mercedes"],["Espagne","13 sept.","Kimi Antonelli","Mercedes"],
+["Azerbaïdjan","26 sept.","George Russell","Mercedes"],["Bahreïn (Sepang)","4 oct.","Max Verstappen","Red Bull"]
+];
+document.getElementById("races").innerHTML=RACES.map((r,i)=>{const c=COL[r[3]]||"#888";
+return `<div class="race"><div class="rd">${i+1}</div><div><div class="gp">GP ${r[0]}</div><div class="dt">${r[1]} 2026</div></div><div class="win"><span class="dot" style="background:${c};display:inline-block;margin-right:5px"></span>${r[2]}<small>${r[3]}</small></div></div>`}).join("");
+function tab(n){["1","2"].forEach(k=>{document.getElementById("v"+k).hidden=k!=n;document.getElementById("t"+k).classList.toggle("on",k==n)})}
+document.getElementById("t1").onclick=()=>tab("1");
+document.getElementById("t2").onclick=()=>tab("2");
+</script>
+</body>
+</html>
