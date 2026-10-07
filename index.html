@@ -69,9 +69,12 @@ input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--lin
 <div id="list"></div></div>
 <div id="v2" hidden><div id="races"></div></div>
 <div id="v3" hidden><div id="cons"></div></div>
-<p class="foot">Mis à jour après chaque Grand Prix.</p>
+<p class="foot">Chargement des données en direct…</p>
 <script>
-const DATA={
+/* v3 : mise à jour automatique via API Jolpica */
+const $=id=>document.getElementById(id);
+let UP=[["Singapour","11 oct."],["États-Unis (Austin)","25 oct."],["Mexique","1 nov."],["Brésil","8 nov."],["Las Vegas","21 nov."],["Qatar","29 nov."],["Abu Dhabi","6 déc."]];
+let DATA={
   round:16, total:23, after:"Grand Prix de Bahreïn (Sepang)", date:"4 octobre 2026",
   next:"Singapour", nextDate:"11 octobre 2026",
   drivers:[
@@ -90,21 +93,7 @@ const DATA={
   ]
 };
 const COL={"Mercedes":"#27f4d2","Ferrari":"#e8002d","McLaren":"#ff8000","Red Bull":"#3671c6","Racing Bulls":"#6692ff","Alpine":"#ff87bc","Haas":"#b6babd","Audi":"#c0392b","Aston Martin":"#229971","Williams":"#64c4ff","Cadillac":"#8a8a99"};
-document.getElementById("sub").textContent="Après la manche "+DATA.round+"/"+DATA.total+" · "+DATA.after+" · "+DATA.date;
-document.getElementById("nx").textContent=DATA.next;
-document.getElementById("nd").textContent=DATA.nextDate;
-const max=DATA.drivers[0][2];
-function render(f){
-  const t=(f||"").toLowerCase();
-  document.getElementById("list").innerHTML=DATA.drivers.map((d,i)=>{
-    if(t&&!(d[0]+" "+d[1]).toLowerCase().includes(t))return"";
-    const c=COL[d[1]]||"#888",gap=i?"−"+(max-d[2])+" pts":"Leader";
-    return `<div class="row"><div class="pos">${i+1}</div><div><div class="name"><span class="dot" style="background:${c}"></span>${d[0]}</div><div class="team">${d[1]}</div><div class="bar"><i style="width:${d[2]/max*100}%;background:${c}"></i></div></div><div class="pts">${d[2]}<span class="gap">${gap}</span></div></div>`;
-  }).join("");
-}
-document.getElementById("q").addEventListener("input",e=>render(e.target.value));
-render();
-const RACES=[
+let RACES=[
 ["Australie","8 mars","George Russell","Mercedes"],["Chine","15 mars","Kimi Antonelli","Mercedes"],
 ["Japon","29 mars","Kimi Antonelli","Mercedes"],["Miami","3 mai","Kimi Antonelli","Mercedes"],
 ["Canada","24 mai","Kimi Antonelli","Mercedes"],["Monaco","7 juin","Kimi Antonelli","Mercedes"],
@@ -116,8 +105,7 @@ const RACES=[
 ];
 const N={ANT:"Kimi Antonelli",RUS:"George Russell",HAM:"Lewis Hamilton",LEC:"Charles Leclerc",NOR:"Lando Norris",VER:"Max Verstappen",PIA:"Oscar Piastri",HAD:"Isack Hadjar",LAW:"Liam Lawson",GAS:"Pierre Gasly",LIN:"Arvid Lindblad",COL:"Franco Colapinto",BEA:"Oliver Bearman",BOR:"Gabriel Bortoleto",HUL:"Nico Hülkenberg",OCO:"Esteban Ocon",ALO:"Fernando Alonso",SAI:"Carlos Sainz",ALB:"Alex Albon",STR:"Lance Stroll",BOT:"Valtteri Bottas",PER:"Sergio Pérez",TSU:"Yuki Tsunoda"};
 const TEAM={};DATA.drivers.forEach(d=>TEAM[d[0]]=d[1]);
-/* Ordre d'arrivée : classés | abandons / non classés. null = pas encore renseigné */
-const RES=[
+let RES=[
 "RUS ANT LEC HAM NOR VER BEA LIN BOR GAS OCO ALB LAW COL SAI PER STR | ALO BOT HAD PIA HUL",
 "ANT RUS HAM LEC BEA GAS LAW HAD SAI COL HUL LIN BOT OCO PER | VER ALO STR NOR BOR ALB PIA",
 "ANT PIA LEC RUS NOR HAM GAS VER LAW OCO HUL HAD BOR LIN SAI COL PER ALO BOT ALB | STR BEA",
@@ -137,25 +125,98 @@ const RES=[
 ];
 const P="Classement provisoire : les pénalités de dernière minute peuvent ne pas être incluses.";
 const NOTE={9:P,12:P,13:P};
+
+/* Noms français des Grands Prix, par numéro de manche (utilisé pour les données en direct) */
+const FR=["","Australie","Chine","Japon","Miami","Canada","Monaco","Barcelone-Catalogne","Autriche","Grande-Bretagne","Belgique","Hongrie","Pays-Bas","Italie","Espagne","Azerbaïdjan","Bahreïn (Sepang)","Singapour","États-Unis (Austin)","Mexique","Brésil","Las Vegas","Qatar","Abu Dhabi"];
+const TALIAS={"RB F1 Team":"Racing Bulls","Red Bull Racing":"Red Bull","Haas F1 Team":"Haas","Alpine F1 Team":"Alpine","Cadillac F1 Team":"Cadillac","Audi F1 Team":"Audi","Aston Martin F1 Team":"Aston Martin","Williams F1 Team":"Williams","McLaren F1 Team":"McLaren","Scuderia Ferrari":"Ferrari","Mercedes-AMG Petronas":"Mercedes"};
+const tname=n=>TALIAS[n]||String(n||"").replace(/ F1 Team$/,"");
+let TOTAL=DATA.total;
+function render(f){
+  const t=(f||"").toLowerCase(),max=DATA.drivers[0][2]||1;
+  $("list").innerHTML=DATA.drivers.map((d,i)=>{
+    if(t&&!(d[0]+" "+d[1]).toLowerCase().includes(t))return"";
+    const c=COL[d[1]]||"#888",gap=i?"−"+(DATA.drivers[0][2]-d[2])+" pts":"Leader";
+    return `<div class="row"><div class="pos">${i+1}</div><div><div class="name"><span class="dot" style="background:${c}"></span>${d[0]}</div><div class="team">${d[1]}</div><div class="bar"><i style="width:${d[2]/max*100}%;background:${c}"></i></div></div><div class="pts">${d[2]}<span class="gap">${gap}</span></div></div>`;
+  }).join("");
+}
+$("q").addEventListener("input",e=>render(e.target.value));
 function detail(i){
   const s=RES[i];
   if(!s)return '<div class="nodet">Classement complet bientôt disponible.</div>';
   const p=s.split("|").map(x=>x.trim().split(" ").filter(Boolean));
-  const row=(c,k)=>{const n=N[c],t=TEAM[n]||"",col=COL[t]||"#888";return `<div class="rr"><span class="rp">${k}</span><span class="dot" style="background:${col}"></span><span>${n}</span><span class="rt">${t}</span></div>`};
+  const row=(c,k)=>{const n=N[c]||c,t=TEAM[n]||"",col=COL[t]||"#888";return `<div class="rr"><span class="rp">${k}</span><span class="dot" style="background:${col}"></span><span>${n}</span><span class="rt">${t}</span></div>`};
   return p[0].map((c,k)=>row(c,k+1)).join("")+(p[1]||[]).map(c=>row(c,"—")).join("")+'<div class="note">— : abandon ou non classé</div>'+(NOTE[i]?'<div class="note">'+NOTE[i]+'</div>':"");
 }
-document.getElementById("races").innerHTML=RACES.map((r,i)=>{const c=COL[r[3]]||"#888";
-return `<div class="race" data-i="${i}"><div class="rd">${i+1}</div><div><div class="gp">GP ${r[0]}<span class="chev">▼</span></div><div class="dt">${r[1]} 2026</div></div><div class="win"><span class="dot" style="background:${c};display:inline-block;margin-right:5px"></span>${r[2]}<small>${r[3]}</small></div><div class="det">${detail(i)}</div></div>`}).join("");
-document.getElementById("races").addEventListener("click",e=>{const r=e.target.closest(".race");if(r)r.classList.toggle("open")});
-const T={};DATA.drivers.forEach(d=>T[d[1]]=(T[d[1]]||0)+d[2]);
-const TL=Object.entries(T).sort((a,b)=>b[1]-a[1]);
-document.getElementById("cons").innerHTML=TL.map((t,i)=>{const c=COL[t[0]]||"#888",gap=i?"−"+(TL[0][1]-t[1])+" pts":"Leader";
-return `<div class="row"><div class="pos">${i+1}</div><div><div class="name"><span class="dot" style="background:${c}"></span>${t[0]}</div><div class="bar"><i style="width:${t[1]/TL[0][1]*100}%;background:${c}"></i></div></div><div class="pts">${t[1]}<span class="gap">${gap}</span></div></div>`}).join("");
-const UP=[["Singapour","11 oct."],["États-Unis (Austin)","25 oct."],["Mexique","1 nov."],["Brésil","8 nov."],["Las Vegas","21 nov."],["Qatar","29 nov."],["Abu Dhabi","6 déc."]];
-document.getElementById("cal").innerHTML=RACES.map((r,i)=>`<div class="crow done"><span class="rp">${i+1}</span><div><b>GP ${r[0]}</b><small>Vainqueur : ${r[2]}</small></div><span class="d">${r[1]}</span></div>`).join("")+UP.map((u,i)=>`<div class="crow${i?"":" nx"}"><span class="rp">${RACES.length+i+1}</span><div><b>GP ${u[0]}</b><small>${i?"À venir":"Prochain Grand Prix"}</small></div><span class="d">${u[1]}</span></div>`).join("");
-document.getElementById("nextbox").onclick=function(){const c=document.getElementById("cal");c.hidden=!c.hidden;this.classList.toggle("open",!c.hidden)};
-function tab(n){["1","2","3"].forEach(k=>{document.getElementById("v"+k).hidden=k!=n;document.getElementById("t"+k).classList.toggle("on",k==n)})}
-["1","2","3"].forEach(k=>document.getElementById("t"+k).onclick=()=>tab(k));
+function build(){
+  $("sub").textContent="Après la manche "+DATA.round+"/"+TOTAL+" · "+DATA.after+" · "+DATA.date;
+  $("nx").textContent=DATA.next;
+  $("nd").textContent=DATA.nextDate;
+  render($("q").value);
+  const open=[...document.querySelectorAll("#races .race.open")].map(e=>e.dataset.i);
+  $("races").innerHTML=RACES.map((r,i)=>{const c=COL[r[3]]||"#888";
+  return `<div class="race${open.includes(String(i))?" open":""}" data-i="${i}"><div class="rd">${i+1}</div><div><div class="gp">GP ${r[0]}<span class="chev">▼</span></div><div class="dt">${r[1]} 2026</div></div><div class="win"><span class="dot" style="background:${c};display:inline-block;margin-right:5px"></span>${r[2]}<small>${r[3]}</small></div><div class="det">${detail(i)}</div></div>`}).join("");
+  const T={};DATA.drivers.forEach(d=>T[d[1]]=(T[d[1]]||0)+d[2]);
+  const TL=Object.entries(T).sort((a,b)=>b[1]-a[1]);
+  $("cons").innerHTML=TL.map((t,i)=>{const c=COL[t[0]]||"#888",gap=i?"−"+(TL[0][1]-t[1])+" pts":"Leader";
+  return `<div class="row"><div class="pos">${i+1}</div><div><div class="name"><span class="dot" style="background:${c}"></span>${t[0]}</div><div class="bar"><i style="width:${t[1]/TL[0][1]*100}%;background:${c}"></i></div></div><div class="pts">${t[1]}<span class="gap">${gap}</span></div></div>`}).join("");
+  $("cal").innerHTML=RACES.map((r,i)=>`<div class="crow done"><span class="rp">${i+1}</span><div><b>GP ${r[0]}</b><small>Vainqueur : ${r[2]}</small></div><span class="d">${r[1]}</span></div>`).join("")+UP.map((u,i)=>`<div class="crow${i?"":" nx"}"><span class="rp">${RACES.length+i+1}</span><div><b>GP ${u[0]}</b><small>${i?"À venir":"Prochain Grand Prix"}</small></div><span class="d">${u[1]}</span></div>`).join("");
+}
+$("races").addEventListener("click",e=>{const r=e.target.closest(".race");if(r)r.classList.toggle("open")});
+$("nextbox").onclick=function(){const c=$("cal");c.hidden=!c.hidden;this.classList.toggle("open",!c.hidden)};
+function tab(n){["1","2","3"].forEach(k=>{$("v"+k).hidden=k!=n;$("t"+k).classList.toggle("on",k==n)})}
+["1","2","3"].forEach(k=>$("t"+k).onclick=()=>tab(k));
+build();
+
+/* ===== Mise à jour automatique (API Jolpica / Ergast, gratuite) ===== */
+const API="https://api.jolpi.ca/ergast/f1/2026";
+async function J(path){
+  const c=new AbortController(),t=setTimeout(()=>c.abort(),9000);
+  try{const r=await fetch(API+path,{signal:c.signal});if(!r.ok)throw new Error(r.status);return await r.json()}
+  finally{clearTimeout(t)}
+}
+const fd=(d,o)=>new Date(d+"T12:00:00Z").toLocaleDateString("fr-FR",Object.assign({timeZone:"UTC"},o));
+const short=d=>fd(d,{day:"numeric",month:"short"});
+const long=d=>fd(d,{day:"numeric",month:"long",year:"numeric"});
+const fullName=d=>N[d.code]||((d.givenName+" "+d.familyName).replace(/^Andrea /,""));
+async function live(){
+  const st=await J("/driverStandings.json");
+  const L=st.MRData.StandingsTable.StandingsLists[0];
+  if(!L||!L.DriverStandings||!L.DriverStandings.length)throw new Error("vide");
+  const round=+L.round;
+  const sc=await J("/races.json?limit=40");
+  const races=sc.MRData.RaceTable.Races;
+  const frn=r=>FR[+r.round]||r.raceName.replace(/ Grand Prix.*/,"");
+  const drivers=L.DriverStandings.map(x=>{
+    const n=fullName(x.Driver);N[x.Driver.code]=n;
+    const team=tname(x.Constructors[x.Constructors.length-1].name);
+    return [n,team,+x.points]});
+  // résultats des manches pas encore connues
+  const res=RES.slice(0,round),rows=RACES.slice(0,round);
+  for(let r=1;r<=round;r++){
+    if(res[r-1]&&rows[r-1])continue;
+    const rr=await J("/"+r+"/results.json?limit=40");
+    const R=rr.MRData.RaceTable.Races[0];if(!R)continue;
+    const ok=[],ko=[];
+    R.Results.forEach(x=>{const c=x.Driver.code||x.Driver.driverId.slice(0,3).toUpperCase();
+      N[c]=fullName(x.Driver);TEAM[N[c]]=tname(x.Constructor.name);
+      (/^\d+$/.test(x.positionText)?ok:ko).push(c)});
+    res[r-1]=ok.join(" ")+(ko.length?" | "+ko.join(" "):"");
+    const w=R.Results[0],wn=N[w.Driver.code]||fullName(w.Driver);
+    rows[r-1]=[frn(R),short(R.date),wn,tname(w.Constructor.name)];
+  }
+  // pour les manches déjà connues, on garde les données intégrées
+  for(let r=1;r<=round;r++){if(!rows[r-1])rows[r-1]=RACES[r-1]}
+  drivers.forEach(d=>TEAM[d[0]]=d[1]);
+  const up=races.filter(r=>+r.round>round).map(r=>[frn(r),short(r.date)]);
+  const last=races.find(r=>+r.round===round),nxt=races.find(r=>+r.round===round+1);
+  DATA={round,total:races.length,after:"GP "+frn(last),date:long(last.date),
+    next:nxt?frn(nxt):"Saison terminée",nextDate:nxt?long(nxt.date):"",drivers};
+  TOTAL=races.length;RACES=rows;RES=res;UP=up;
+  build();
+  const f=document.querySelector(".foot");
+  f.textContent="Données en direct ✓ · actualisées à "+new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+}
+live().catch(()=>{document.querySelector(".foot").textContent="Hors connexion : dernières données intégrées affichées."});
 </script>
 </body>
 </html>
