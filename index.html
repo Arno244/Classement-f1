@@ -210,6 +210,7 @@ async function live(){
   const drivers=L.DriverStandings.map(x=>{
     const n=fullName(x.Driver);N[x.Driver.code]=n;
     const team=tname(x.Constructors[x.Constructors.length-1].name);
+    ID[n]=x.Driver.driverId;CID[team]=x.Constructors[x.Constructors.length-1].constructorId;
     return [n,team,+x.points]});
   // résultats des manches pas encore connues
   const res=RES.slice(0,round),rows=RACES.slice(0,round);
@@ -257,7 +258,7 @@ function hist(name){
     else cls="n";
     chips.push(`<span class="ch ${cls}" title="GP ${g}"><i>${g.slice(0,3).toUpperCase()}</i>${v}</span>`)});
   const st=[[di+1+"e","Classement"],[pts,"Points"],[w,"Victoires"],[pod,"Podiums"],[t5,"Top 5"],[dnf,"Abandons / NC"],[ent,"Courses"],[best?best+"e":"–","Meilleur résultat"],[fin?(sum/fin).toFixed(1):"–","Position moy."]];
-  return `<div class="dhead"><div class="av" data-n="${name}" style="background:${col}">${avHTML(name)}</div><div><div class="dn">${name}</div><div class="ds">${team} · Saison 2026</div></div></div><div class="st">${st.map(a=>`<div><b>${a[0]}</b>${a[1]}</div>`).join("")}</div><div class="chs">${chips.join("")}</div><div class="lg">Résultat de chaque Grand Prix (ordre de la saison). Or : victoire · gris : podium · ✕ : abandon ou non classé · – : absent.</div><div class="lg">Photo : Wikipédia (si disponible).</div>`;
+  return `<div class="dhead"><div class="av" data-n="${name}" style="background:${col}">${avHTML(name)}</div><div><div class="dn">${name}</div><div class="ds">${team} · Saison 2026</div></div></div><div class="st">${st.map(a=>`<div><b>${a[0]}</b>${a[1]}</div>`).join("")}</div><div class="chs">${chips.join("")}</div><div class="lg">Résultat de chaque Grand Prix (ordre de la saison). Or : victoire · gris : podium · ✕ : abandon ou non classé · – : absent.</div><div class="lg">Photo : Wikipédia (si disponible).</div>${carBlock("d",ID[name])}`;
 }
 async function photo(name){
   if(name in PH)return;PH[name]=null;
@@ -273,7 +274,7 @@ document.getElementById("list").addEventListener("click",e=>{
   const r=e.target.closest(".drv");if(!r||e.target.closest(".dh"))return;
   const n=r.dataset.n;
   if(OPEN.has(n)){OPEN.delete(n);r.classList.remove("open");return}
-  OPEN.add(n);r.querySelector(".dh").innerHTML=hist(n);r.classList.add("open");photo(n);
+  OPEN.add(n);r.querySelector(".dh").innerHTML=hist(n);r.classList.add("open");photo(n);loadCareer("d",ID[n]);
 });
 
 /* ===== Fiche équipe : historique ===== */
@@ -296,14 +297,65 @@ function thist(team){
   const st=[[rk+"e","Classement"],[pts,"Points"],[w,"Victoires"],[pod,"Podiums (pilotes)"],[t5,"Top 5 (pilotes)"],[dnf,"Abandons / NC"],[ent,"Départs (pilotes)"],[best?best+"e":"–","Meilleur résultat"],[DATA.drivers.filter(d=>d[1]===team).length,"Pilotes"]];
   const dr=DATA.drivers.filter(d=>d[1]===team).map(d=>{const c=Object.keys(N).find(k=>N[k]===d[0]),q=per[c]||{w:0,pod:0,dnf:0,ent:0};
     return `<div class="rr" style="grid-template-columns:1fr auto"><span>${d[0]}</span><span class="rt">${d[2]} pts · ${q.w} vict. · ${q.pod} pod. · ${q.dnf} aband./NC</span></div>`}).join("");
-  return `<div class="dhead"><div class="av" style="background:${col}">${ini(team)}</div><div><div class="dn">${team}</div><div class="ds">Saison 2026</div></div></div><div class="st">${st.map(a=>`<div><b>${a[0]}</b>${a[1]}</div>`).join("")}</div><div class="ds" style="margin-bottom:6px">Détail par pilote</div>${dr}<div class="ds" style="margin:10px 0 6px">Meilleur résultat de l'équipe à chaque Grand Prix</div><div class="chs">${chips.join("")}</div><div class="lg">Or : victoire · gris : podium · ✕ : abandon ou non classé · – : absent. Les pilotes sont rattachés à leur équipe actuelle ; « Victoires » compte les courses gagnées par l'équipe.</div>`;
+  return `<div class="dhead"><div class="av" style="background:${col}">${ini(team)}</div><div><div class="dn">${team}</div><div class="ds">Saison 2026</div></div></div><div class="st">${st.map(a=>`<div><b>${a[0]}</b>${a[1]}</div>`).join("")}</div><div class="ds" style="margin-bottom:6px">Détail par pilote</div>${dr}<div class="ds" style="margin:10px 0 6px">Meilleur résultat de l'équipe à chaque Grand Prix</div><div class="chs">${chips.join("")}</div><div class="lg">Or : victoire · gris : podium · ✕ : abandon ou non classé · – : absent. Les pilotes sont rattachés à leur équipe actuelle ; « Victoires » compte les courses gagnées par l'équipe.</div>${carBlock("c",CID[team])}`;
 }
 document.getElementById("cons").addEventListener("click",e=>{
   const r=e.target.closest(".tm");if(!r||e.target.closest(".dh"))return;
   const k="T:"+r.dataset.t;
   if(OPEN.has(k)){OPEN.delete(k);r.classList.remove("open");return}
-  OPEN.add(k);r.querySelector(".dh").innerHTML=thist(r.dataset.t);r.classList.add("open");
+  OPEN.add(k);r.querySelector(".dh").innerHTML=thist(r.dataset.t);r.classList.add("open");loadCareer("c",CID[r.dataset.t]);
 });
+
+/* ===== Carrière : toutes les saisons (API Jolpica, chargée à l'ouverture de la fiche) ===== */
+const ID={},CID={},CAR={},INF={};
+const TITD={hamilton:[2008,2014,2015,2017,2018,2019,2020],max_verstappen:[2021,2022,2023,2024],alonso:[2005,2006],norris:[2025]};
+const TITC={ferrari:[1961,1964,1975,1976,1977,1979,1982,1983,1999,2000,2001,2002,2003,2004,2007,2008],mclaren:[1974,1984,1985,1988,1989,1990,1991,1998,2024,2025],mercedes:[2014,2015,2016,2017,2018,2019,2020,2021],red_bull:[2010,2011,2012,2013,2022,2023],williams:[1980,1981,1986,1987,1992,1993,1994,1996,1997]};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function jt(p){
+  await sleep(280);
+  const c=new AbortController(),t=setTimeout(()=>c.abort(),12000);
+  try{const r=await fetch("https://api.jolpi.ca/ergast/f1"+p,{signal:c.signal});if(!r.ok)throw new Error(r.status);return await r.json()}
+  finally{clearTimeout(t)}
+}
+async function career(kind,id){
+  const base=(kind==="c"?"/constructors/":"/drivers/")+id;
+  const R=await jt(base+"/results/1.json?limit=100");
+  const wins=+R.MRData.total;let races=R.MRData.RaceTable.Races.slice();
+  while(races.length<wins&&races.length%100===0){
+    const M=await jt(base+"/results/1.json?limit=100&offset="+races.length);
+    const x=M.MRData.RaceTable.Races;if(!x.length)break;races=races.concat(x)}
+  const by={};races.forEach(r=>by[r.season]=(by[r.season]||0)+1);
+  let p2=0,p3=0;
+  if(kind!=="c"){p2=+(await jt(base+"/results/2.json?limit=1")).MRData.total;p3=+(await jt(base+"/results/3.json?limit=1")).MRData.total}
+  const poles=+(await jt(base+"/grid/1/results.json?limit=1")).MRData.total;
+  const starts=+(await jt(base+"/results.json?limit=1")).MRData.total;
+  const seasons=(await jt(base+"/seasons.json?limit=100")).MRData.SeasonTable.Seasons.map(x=>+x.season);
+  return {wins,pod:wins+p2+p3,poles,starts,seasons,by,titles:((kind==="c"?TITC:TITD)[id]||[])};
+}
+function carHTML(kind,id){
+  const k=kind+":"+id,d=CAR[k];
+  if(!id)return "Statistiques de carrière disponibles dès que les données en direct sont chargées (connexion nécessaire).";
+  if(d==="err")return "Statistiques de carrière indisponibles pour le moment (connexion ?). Refermez puis rouvrez la fiche pour réessayer.";
+  if(!d)return "Chargement des statistiques de carrière…";
+  const T=kind==="c";
+  const st=T?[[d.titles.length,"Titres constructeurs"],[d.wins,"Victoires"],[d.poles,"Pole positions"],[d.seasons.length,"Saisons"],[d.starts,"Départs (voitures)"],[d.seasons.length?d.seasons[0]:"–","Première saison"]]
+    :[[d.titles.length,"Titres mondiaux"],[d.wins,"Victoires"],[d.pod,"Podiums"],[d.poles,"Pole positions"],[d.starts,"Courses"],[d.seasons.length,"Saisons"]];
+  const yrs=d.seasons.map(y=>{const w=d.by[y]||0,t=d.titles.includes(y);return `<span class="ch ${t?"w":w?"p":"n"}" title="${y} : ${w} victoire(s)${t?" · titre":""}"><i>${y}</i>${w}${t?"★":""}</span>`}).join("");
+  return `<div class="st">${st.map(a=>`<div><b>${a[0]}</b>${a[1]}</div>`).join("")}</div><div class="chs">${yrs}</div><div class="lg">Victoires par saison (★ : saison du titre mondial). Source : base Jolpica/Ergast. ${T?"Les équipes rebaptisées (ex. Renault → Alpine) sont comptées séparément. ":""}Les titres sont une liste fixe ; ceux de la saison en cours ne sont pas inclus.</div>`;
+}
+function carBlock(kind,id){
+  return `<div class="ds" style="margin:12px 0 6px">Carrière (toutes les saisons)</div><div class="cr" data-k="${kind}:${id}">${carHTML(kind,id)}</div>`;
+}
+function carUpd(k){const [kind,id]=k.split(":");document.querySelectorAll(".cr").forEach(e=>{if(e.dataset.k===k)e.innerHTML=carHTML(kind,id)})}
+async function loadCareer(kind,id){
+  if(!id)return;const k=kind+":"+id;
+  if(CAR[k]&&CAR[k]!=="err"||INF[k])return;
+  try{const o=JSON.parse(localStorage.getItem("car2:"+k)||"null");if(o&&Date.now()-o.t<864e5){CAR[k]=o.d;carUpd(k);return}}catch(e){}
+  INF[k]=1;
+  try{CAR[k]=await career(kind,id);try{localStorage.setItem("car2:"+k,JSON.stringify({t:Date.now(),d:CAR[k]}))}catch(e){}}
+  catch(e){CAR[k]="err"}
+  INF[k]=0;carUpd(k);
+}
 </script>
 </body>
 </html>
