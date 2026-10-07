@@ -27,7 +27,7 @@ input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--lin
 .pts{text-align:right;font-weight:700;font-size:18px}
 .gap{color:var(--mut);font-size:11px;font-weight:400;display:block}
 .tabs{display:flex;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:12px}
-.tabs button{flex:1;border:0;background:none;color:var(--mut);font:600 14px system-ui,sans-serif;padding:9px;border-radius:9px;cursor:pointer}
+.tabs button{flex:1;border:0;background:none;color:var(--mut);font:600 13px/1.2 system-ui,sans-serif;padding:8px 4px;border-radius:9px;cursor:pointer}
 .tabs button.on{background:var(--acc);color:#fff}
 .race{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px}
 .rd{color:var(--mut);font-weight:700;font-size:13px;text-align:center}
@@ -35,17 +35,40 @@ input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--lin
 .dt{color:var(--mut);font-size:12px}
 .win{text-align:right;font-size:14px;font-weight:600}
 .win small{display:block;color:var(--mut);font-weight:400;font-size:12px}
+.next{cursor:pointer}
+.next.open .chev{transform:rotate(180deg)}
+#cal{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 12px;margin:-4px 0 12px}
+.crow{display:grid;grid-template-columns:26px 1fr auto;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+.crow:last-child{border-bottom:0}
+.crow b{font-weight:600}
+.crow small{display:block;color:var(--mut);font-size:11px}
+.crow .d{color:var(--mut);font-size:12px;text-align:right}
+.crow.done .d::after{content:" ✓"}
+.crow.nx{color:var(--acc)}
+.crow.nx .d{color:var(--acc);font-weight:700}
+.race{cursor:pointer}
+.chev{color:var(--mut);font-size:11px;margin-left:4px;display:inline-block;transition:transform .2s}
+.race.open .chev{transform:rotate(180deg)}
+.det{grid-column:1/-1;display:none;border-top:1px solid var(--line);padding-top:8px;margin-top:2px}
+.race.open .det{display:block}
+.rr{display:grid;grid-template-columns:26px 12px 1fr auto;gap:6px;align-items:center;font-size:13px;padding:3px 0}
+.rp{color:var(--mut);font-weight:700;text-align:right}
+.rt{color:var(--mut);font-size:12px}
+.nodet,.note{color:var(--mut);font-size:12px}
+.note{margin-top:6px}
 .foot{color:var(--mut);font-size:12px;margin:14px 0 6px;text-align:center}
 </style>
 </head>
 <body>
 <h1>🏁 Classement pilotes <span>F1 2026</span></h1>
 <p class="sub" id="sub"></p>
-<div class="next"><span>Prochain GP : <b id="nx"></b></span><span id="nd"></span></div>
-<div class="tabs"><button id="t1" class="on">Classement</button><button id="t2">Courses</button></div>
+<div class="next" id="nextbox"><span>Prochain GP : <b id="nx"></b> <span class="chev">▼</span></span><span id="nd"></span></div>
+<div id="cal" hidden></div>
+<div class="tabs"><button id="t1" class="on">Classement pilotes</button><button id="t2">Courses</button><button id="t3">Classement constructeurs</button></div>
 <div id="v1"><input id="q" type="search" placeholder="Rechercher un pilote ou une écurie…">
 <div id="list"></div></div>
 <div id="v2" hidden><div id="races"></div></div>
+<div id="v3" hidden><div id="cons"></div></div>
 <p class="foot">Mis à jour après chaque Grand Prix.</p>
 <script>
 const DATA={
@@ -91,11 +114,32 @@ const RACES=[
 ["Italie","6 sept.","Kimi Antonelli","Mercedes"],["Espagne","13 sept.","Kimi Antonelli","Mercedes"],
 ["Azerbaïdjan","26 sept.","George Russell","Mercedes"],["Bahreïn (Sepang)","4 oct.","Max Verstappen","Red Bull"]
 ];
-document.getElementById("races").innerHTML=RACES.map((r,i)=>{const c=COL[r[3]]||"#888";
-return `<div class="race"><div class="rd">${i+1}</div><div><div class="gp">GP ${r[0]}</div><div class="dt">${r[1]} 2026</div></div><div class="win"><span class="dot" style="background:${c};display:inline-block;margin-right:5px"></span>${r[2]}<small>${r[3]}</small></div></div>`}).join("");
-function tab(n){["1","2"].forEach(k=>{document.getElementById("v"+k).hidden=k!=n;document.getElementById("t"+k).classList.toggle("on",k==n)})}
-document.getElementById("t1").onclick=()=>tab("1");
-document.getElementById("t2").onclick=()=>tab("2");
-</script>
-</body>
-</html>
+const N={ANT:"Kimi Antonelli",RUS:"George Russell",HAM:"Lewis Hamilton",LEC:"Charles Leclerc",NOR:"Lando Norris",VER:"Max Verstappen",PIA:"Oscar Piastri",HAD:"Isack Hadjar",LAW:"Liam Lawson",GAS:"Pierre Gasly",LIN:"Arvid Lindblad",COL:"Franco Colapinto",BEA:"Oliver Bearman",BOR:"Gabriel Bortoleto",HUL:"Nico Hülkenberg",OCO:"Esteban Ocon",ALO:"Fernando Alonso",SAI:"Carlos Sainz",ALB:"Alex Albon",STR:"Lance Stroll",BOT:"Valtteri Bottas",PER:"Sergio Pérez",TSU:"Yuki Tsunoda"};
+const TEAM={};DATA.drivers.forEach(d=>TEAM[d[0]]=d[1]);
+/* Ordre d'arrivée : classés | abandons / non classés. null = pas encore renseigné */
+const RES=[
+"RUS ANT LEC HAM NOR VER BEA LIN BOR GAS OCO ALB LAW COL SAI PER STR | ALO BOT HAD PIA HUL",
+"ANT RUS HAM LEC BEA GAS LAW HAD SAI COL HUL LIN BOT OCO PER | VER ALO STR NOR BOR ALB PIA",
+"ANT PIA LEC RUS NOR HAM GAS VER LAW OCO HUL HAD BOR LIN SAI COL PER ALO BOT ALB | STR BEA",
+"ANT NOR PIA RUS VER HAM COL LEC SAI ALB BEA BOR OCO LIN ALO PER STR BOT | HUL LAW GAS HAD",
+"ANT HAM VER LEC HAD COL LAW GAS SAI BEA PIA HUL BOR OCO STR BOT | PER NOR RUS ALO ALB LIN",
+"ANT HAM HAD PIA LAW LIN GAS ALB OCO ALO BOR RUS HUL COL PER | SAI LEC STR NOR BEA BOT VER",
+"HAM RUS NOR VER PIA HAD GAS LAW LIN COL BOR SAI OCO PER LEC | ANT BEA ALB ALO HUL BOT STR",
+"RUS VER ANT PIA HAM HAD NOR LEC LAW LIN BOR HUL GAS BEA COL OCO ALB ALO | STR SAI PER BOT",
+"LEC RUS HAM NOR HAD LAW LIN BOR COL GAS PIA BEA OCO PER ANT BOT SAI ALO STR | VER ALB HUL",
+"ANT LEC VER HAM PIA HAD NOR BOR LIN COL GAS LAW HUL BEA ALB SAI OCO BOT ALO | STR PER RUS",
+"NOR VER ANT LEC HAM HAD RUS LAW HUL LIN BOR GAS STR ALO COL OCO ALB SAI BEA | PIA PER BOT",
+"NOR ANT RUS HAM LEC PIA LAW HUL ALO GAS TSU LIN BOR COL PER SAI ALB | BOT OCO STR BEA VER",
+"ANT RUS VER NOR PIA HAM GAS LIN COL TSU BOR HUL SAI LAW BEA OCO ALB PER BOT | STR ALO LEC",
+"ANT VER NOR LEC RUS LAW COL PIA LIN HUL OCO BOR GAS TSU ALB BEA ALO BOT | SAI PER STR HAM",
+"RUS VER HAD LEC ANT HAM LIN OCO BEA SAI HUL LAW BOR PIA PER BOT | COL GAS NOR ALB ALO STR",
+"VER ANT HAM LEC HAD PIA LAW ALO NOR LIN HUL STR COL BEA OCO GAS SAI BOR PER RUS | ALB BOT"
+];
+const P="Classement provisoire : les pénalités de dernière minute peuvent ne pas être incluses.";
+const NOTE={9:P,12:P,13:P};
+function detail(i){
+  const s=RES[i];
+  if(!s)return '<div class="nodet">Classement complet bientôt disponible.</div>';
+  const p=s.split("|").map(x=>x.trim().split(" ").filter(Boolean));
+  const row=(c,k)=>{const n=N[c],t=TEAM[n]||"",col=COL[t]||"#888";return `<div class="rr"><span class="rp">${k}</span><span class="dot" style="background:${col}"></span><span>${n}</span><span class="rt">${t}</span></div>`};
+  return p[0].map((c,k)=>row(c,k+1)).join("")+(p[1]||[]).
