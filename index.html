@@ -142,4 +142,20 @@ function detail(i){
   if(!s)return '<div class="nodet">Classement complet bientôt disponible.</div>';
   const p=s.split("|").map(x=>x.trim().split(" ").filter(Boolean));
   const row=(c,k)=>{const n=N[c],t=TEAM[n]||"",col=COL[t]||"#888";return `<div class="rr"><span class="rp">${k}</span><span class="dot" style="background:${col}"></span><span>${n}</span><span class="rt">${t}</span></div>`};
-  return p[0].map((c,k)=>row(c,k+1)).join("")+(p[1]||[]).
+  return p[0].map((c,k)=>row(c,k+1)).join("")+(p[1]||[]).map(c=>row(c,"—")).join("")+'<div class="note">— : abandon ou non classé</div>'+(NOTE[i]?'<div class="note">'+NOTE[i]+'</div>':"");
+}
+document.getElementById("races").innerHTML=RACES.map((r,i)=>{const c=COL[r[3]]||"#888";
+return `<div class="race" data-i="${i}"><div class="rd">${i+1}</div><div><div class="gp">GP ${r[0]}<span class="chev">▼</span></div><div class="dt">${r[1]} 2026</div></div><div class="win"><span class="dot" style="background:${c};display:inline-block;margin-right:5px"></span>${r[2]}<small>${r[3]}</small></div><div class="det">${detail(i)}</div></div>`}).join("");
+document.getElementById("races").addEventListener("click",e=>{const r=e.target.closest(".race");if(r)r.classList.toggle("open")});
+const T={};DATA.drivers.forEach(d=>T[d[1]]=(T[d[1]]||0)+d[2]);
+const TL=Object.entries(T).sort((a,b)=>b[1]-a[1]);
+document.getElementById("cons").innerHTML=TL.map((t,i)=>{const c=COL[t[0]]||"#888",gap=i?"−"+(TL[0][1]-t[1])+" pts":"Leader";
+return `<div class="row"><div class="pos">${i+1}</div><div><div class="name"><span class="dot" style="background:${c}"></span>${t[0]}</div><div class="bar"><i style="width:${t[1]/TL[0][1]*100}%;background:${c}"></i></div></div><div class="pts">${t[1]}<span class="gap">${gap}</span></div></div>`}).join("");
+const UP=[["Singapour","11 oct."],["États-Unis (Austin)","25 oct."],["Mexique","1 nov."],["Brésil","8 nov."],["Las Vegas","21 nov."],["Qatar","29 nov."],["Abu Dhabi","6 déc."]];
+document.getElementById("cal").innerHTML=RACES.map((r,i)=>`<div class="crow done"><span class="rp">${i+1}</span><div><b>GP ${r[0]}</b><small>Vainqueur : ${r[2]}</small></div><span class="d">${r[1]}</span></div>`).join("")+UP.map((u,i)=>`<div class="crow${i?"":" nx"}"><span class="rp">${RACES.length+i+1}</span><div><b>GP ${u[0]}</b><small>${i?"À venir":"Prochain Grand Prix"}</small></div><span class="d">${u[1]}</span></div>`).join("");
+document.getElementById("nextbox").onclick=function(){const c=document.getElementById("cal");c.hidden=!c.hidden;this.classList.toggle("open",!c.hidden)};
+function tab(n){["1","2","3"].forEach(k=>{document.getElementById("v"+k).hidden=k!=n;document.getElementById("t"+k).classList.toggle("on",k==n)})}
+["1","2","3"].forEach(k=>document.getElementById("t"+k).onclick=()=>tab(k));
+</script>
+</body>
+</html>
