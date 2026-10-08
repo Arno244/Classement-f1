@@ -1,10 +1,10 @@
 {
- "id": "./?app=monoplaces-2026-v2",
+ "id": "/Classement-f1/",
  "name": "Classement Monoplaces 2026",
  "short_name": "Monoplaces 2026",
  "lang": "fr",
- "start_url": "./",
- "scope": "./",
+ "start_url": "/Classement-f1/",
+ "scope": "/Classement-f1/",
  "display": "standalone",
  "orientation": "portrait",
  "background_color": "#15151e",
