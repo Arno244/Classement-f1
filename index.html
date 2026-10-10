@@ -137,6 +137,10 @@ input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--lin
 .av.ig-ph.wi{background-size:cover;background-position:center}
 .wi[style*="background-image"] .ig-in{display:none}
 .ig-tm{display:flex;flex-direction:column;gap:3px;margin-bottom:2px}
+.ch{position:relative}
+.sb{position:absolute;top:-6px;right:-5px;font-size:9px;line-height:1;font-weight:800;padding:2px 4px;border-radius:9px;background:#2d6cdf;color:#fff;border:1.5px solid #000}
+.sb.w{background:#f2c200;color:#15151e}.sb.p{background:#c9ced8;color:#15151e}.sb.x{background:#c0261b}
+.sp{display:inline-block;margin-left:7px;font-size:10px;font-weight:800;line-height:1;padding:3px 6px;border-radius:9px;background:#2d6cdf;color:#fff;vertical-align:middle}
 </style>
 </head>
 <body>
@@ -258,6 +262,10 @@ const FR=["","Australie","Chine","Japon","Miami","Canada","Monaco","Barcelone-Ca
 const TALIAS={"RB F1 Team":"Racing Bulls","Red Bull Racing":"Red Bull","Haas F1 Team":"Haas","Alpine F1 Team":"Alpine","Cadillac F1 Team":"Cadillac","Audi F1 Team":"Audi","Aston Martin F1 Team":"Aston Martin","Williams F1 Team":"Williams","McLaren F1 Team":"McLaren","Scuderia Ferrari":"Ferrari","Mercedes-AMG Petronas":"Mercedes"};
 const tname=n=>TALIAS[n]||String(n||"").replace(/ F1 Team$/,"");
 let TOTAL=DATA.total;
+const SPR={};try{Object.assign(SPR,JSON.parse(localStorage.getItem("spr26")||"{}"))}catch(e){}
+function sprP(i){const s=SPR[i];return s?s.split("|").map(x=>x.trim().split(" ").filter(Boolean)):null}
+function sprB(codes,i){const p=sprP(i);if(!p)return"";let b=0,x=false;codes.forEach(c=>{const k=p[0].indexOf(c);if(k>=0){if(!b||k+1<b)b=k+1}else if((p[1]||[]).includes(c))x=true});if(!b&&!x)return"";const cls=b===1?"w":b&&b<=3?"p":b?"":"x";return `<b class="sb ${cls}" title="Sprint">S${b||"✕"}</b>`}
+
 function render(f){
   const t=(f||"").toLowerCase(),max=DATA.drivers[0][2]||1;
   $("list").innerHTML=DATA.drivers.map((d,i)=>{
@@ -272,7 +280,8 @@ function detail(i){
   if(!s)return '<div class="nodet">Classement complet bientôt disponible.</div>';
   const p=s.split("|").map(x=>x.trim().split(" ").filter(Boolean));
   const row=(c,k)=>{const n=N[c]||c,t=TEAM[n]||"",col=COL[t]||"#888";return `<div class="rr"><span class="rp">${k}</span><span class="dot" style="background:${col}"></span><span>${n}${tg(t)}</span><span class="rt">${t}</span></div>`};
-  return p[0].map((c,k)=>row(c,k+1)).join("")+(p[1]||[]).map(c=>row(c,"—")).join("")+'<div class="note">— : abandon ou non classé</div>'+(NOTE[i]?'<div class="note">'+NOTE[i]+'</div>':"");
+  const sq=sprP(i),sh=sq?'<div class="ig-h" style="margin:10px 0 6px">Sprint</div>'+sq[0].map((c,k)=>row(c,k+1)).join("")+(sq[1]||[]).map(c=>row(c,"—")).join(""):"";
+  return p[0].map((c,k)=>row(c,k+1)).join("")+(p[1]||[]).map(c=>row(c,"—")).join("")+'<div class="note">— : abandon ou non classé</div>'+sh+(NOTE[i]?'<div class="note">'+NOTE[i]+'</div>':"");
 }
 function build(){
   $("sub").textContent="Après la manche "+DATA.round+"/"+TOTAL+" · "+DATA.after+" · "+DATA.date;
@@ -281,7 +290,7 @@ function build(){
   render($("q").value);
   const open=[...document.querySelectorAll("#races .race.open")].map(e=>e.dataset.i);
   $("races").innerHTML=RACES.map((r,i)=>{const c=COL[r[3]]||"#888";
-  return `<div class="race${open.includes(String(i))?" open":""}" data-i="${i}"><div class="rd">${i+1}</div><div><div class="gp">GP ${r[0]}<span class="chev">▼</span></div><div class="dt">${r[1]} 2026</div></div><div class="win"><span class="dot" style="background:${c};display:inline-block;margin-right:5px"></span>${r[2]}<small>${r[3]}</small></div><div class="det">${detail(i)}</div></div>`}).reverse().join("");
+  return `<div class="race${open.includes(String(i))?" open":""}" data-i="${i}"><div class="rd">${i+1}</div><div><div class="gp">GP ${r[0]}${SPR[i]?'<span class="sp">S</span>':""}<span class="chev">▼</span></div><div class="dt">${r[1]} 2026</div></div><div class="win"><span class="dot" style="background:${c};display:inline-block;margin-right:5px"></span>${r[2]}<small>${r[3]}</small></div><div class="det">${detail(i)}</div></div>`}).reverse().join("");
   const T={};DATA.drivers.forEach(d=>T[d[1]]=(T[d[1]]||0)+d[2]);
   const TL=Object.entries(T).sort((a,b)=>b[1]-a[1]);
   $("cons").innerHTML=TL.map((t,i)=>{const c=COL[t[0]]||"#888",gap=i?"−"+(TL[0][1]-t[1])+" pts":"Leader";
@@ -332,6 +341,11 @@ async function live(){
     const w=R.Results[0],wn=N[w.Driver.code]||fullName(w.Driver);
     rows[r-1]=[frn(R),short(R.date),wn,tname(w.Constructor.name)];
   }
+  try{const sp=await J("/sprint.json?limit=100");const o={};
+    (sp.MRData.RaceTable.Races||[]).forEach(R=>{const L=R.SprintResults||[];if(!L.length)return;const ok=[],ko=[];
+      L.forEach(x=>{const c=x.Driver.code||x.Driver.driverId.slice(0,3).toUpperCase();N[c]=N[c]||fullName(x.Driver);(/^\d+$/.test(x.positionText)?ok:ko).push(c)});
+      o[+R.round-1]=ok.join(" ")+(ko.length?" | "+ko.join(" "):"")});
+    Object.keys(SPR).forEach(k=>delete SPR[k]);Object.assign(SPR,o);try{localStorage.setItem("spr26",JSON.stringify(o))}catch(e){}}catch(e){}
   // pour les manches déjà connues, on garde les données intégrées
   for(let r=1;r<=round;r++){if(!rows[r-1])rows[r-1]=RACES[r-1]}
   drivers.forEach(d=>TEAM[d[0]]=d[1]);
@@ -362,13 +376,13 @@ function hist(name){
     if(k>=0){const r=k+1;ent++;fin++;sum+=r;if(!best||r<best)best=r;if(r===1)w++;if(r<=3)pod++;if(r<=5)t5++;v=r;cls=r===1?"w":r<=3?"p":""}
     else if(x){ent++;dnf++;v="✕";cls="x"}
     else cls="n";
-    chips.push(`<span class="ch ${cls}" title="GP ${g}"><i>${g.slice(0,3).toUpperCase()}</i>${v}</span>`)});
+    chips.push(`<span class="ch ${cls}" title="GP ${g}"><i>${g.slice(0,3).toUpperCase()}</i>${v}${sprB([code],i)}</span>`)});
   const st=[[di+1+"e","Classement"],[pts,"Points"],[w,"Victoires"],[pod,"Podiums"],[t5,"Top 5"],[dnf,"Abandons / NC"],[ent,"Courses"],[best?best+"e":"–","Meilleur résultat"],[fin?(sum/fin).toFixed(1):"–","Position moy."]];
   const ord=n=>n===1?"1er":n+"e";
   const sc=v=>Math.max(9,Math.round(v/Math.max(1,ent)*100));
   const tro=w?"🏆".repeat(Math.min(w,10))+(w>10?` <small>+${w-10}</small>`:""):"";
   const rb=(l,v,cl)=>`<div${cl?` class="${cl}"`:""}>${l}<div class="ig-b"><i style="width:${sc(v)}%">${v}</i></div></div>`;
-  return `<div class="pn" style="--tc:${col}">${wm(name,team)}${wi(team)}<div class="ig-title">${name}${tg(team)}</div><div class="ig-sub">${team}${carOf(name,team)?" · "+carOf(name,team):""} · Saison 2026</div><div class="ig-top"><div class="av ig-ph" data-n="${name}" style="background:${col}">${avHTML(name)}</div><div class="ig-li"><div>Classement : <b>${ord(di+1)}</b></div><div>Points : <b>${pts}</b></div><div>Courses disputées : <b>${ent}</b></div><div>Meilleur résultat : <b>${best?ord(best):"–"}</b></div><div>Position moyenne : <b>${fin?(sum/fin).toFixed(1):"–"}</b></div></div></div><div class="ig-h">Palmarès ${DATA.round?"2026":""}</div>${tro?`<div class="ig-tr">${tro}</div>`:""}<div class="ig-p"><b>${w}</b> victoire${w>1?"s":""} · <b>${pod}</b> podium${pod>1?"s":""}</div><div class="ig-h">Records de la saison</div><div class="ig-rb">${rb("Victoires",w)}${rb("Podiums",pod)}${rb("Top 5",t5)}${rb("Abandons / NC",dnf)}</div><div class="ig-h">Course par course</div><div class="chs">${chips.join("")}</div><div class="lg">Or : victoire · gris : podium · ✕ : abandon ou non classé · – : absent. Barres : sur ${ent} course${ent>1?"s":""}.</div><div class="lg">Photos : Wikipédia (si disponible).</div>${carBlock("d",ID[name])}</div>`;
+  return `<div class="pn" style="--tc:${col}">${wm(name,team)}${wi(team)}<div class="ig-title">${name}${tg(team)}</div><div class="ig-sub">${team}${carOf(name,team)?" · "+carOf(name,team):""} · Saison 2026</div><div class="ig-top"><div class="av ig-ph" data-n="${name}" style="background:${col}">${avHTML(name)}</div><div class="ig-li"><div>Classement : <b>${ord(di+1)}</b></div><div>Points : <b>${pts}</b></div><div>Courses disputées : <b>${ent}</b></div><div>Meilleur résultat : <b>${best?ord(best):"–"}</b></div><div>Position moyenne : <b>${fin?(sum/fin).toFixed(1):"–"}</b></div></div></div><div class="ig-h">Palmarès ${DATA.round?"2026":""}</div>${tro?`<div class="ig-tr">${tro}</div>`:""}<div class="ig-p"><b>${w}</b> victoire${w>1?"s":""} · <b>${pod}</b> podium${pod>1?"s":""}</div><div class="ig-h">Records de la saison</div><div class="ig-rb">${rb("Victoires",w)}${rb("Podiums",pod)}${rb("Top 5",t5)}${rb("Abandons / NC",dnf)}</div><div class="ig-h">Course par course</div><div class="chs">${chips.join("")}</div><div class="lg">Or : victoire · gris : podium · ✕ : abandon ou non classé · – : absent · S : résultat du sprint (week-ends concernés). Barres : sur ${ent} course${ent>1?"s":""}.</div><div class="lg">Photos : Wikipédia (si disponible).</div>${carBlock("d",ID[name])}</div>`;
 }
 async function photo(name){
   if(name in PH)return;PH[name]=null;
@@ -403,7 +417,7 @@ function thist(team){
     let cls="n",v="–";
     if(b){v=b;cls=b===1?"w":b<=3?"p":"";if(b===1)w++;if(!best||b<best)best=b}
     else if(any){v="✕";cls="x"}
-    chips.push(`<span class="ch ${cls}" title="GP ${g}"><i>${g.slice(0,3).toUpperCase()}</i>${v}</span>`)});
+    chips.push(`<span class="ch ${cls}" title="GP ${g}"><i>${g.slice(0,3).toUpperCase()}</i>${v}${sprB(codes,i)}</span>`)});
   const st=[[rk+"e","Classement"],[pts,"Points"],[w,"Victoires"],[pod,"Podiums (pilotes)"],[t5,"Top 5 (pilotes)"],[dnf,"Abandons / NC"],[ent,"Départs (pilotes)"],[best?best+"e":"–","Meilleur résultat"],[DATA.drivers.filter(d=>d[1]===team).length,"Pilotes"]];
   const dr=DATA.drivers.filter(d=>d[1]===team).map(d=>{const c=Object.keys(N).find(k=>N[k]===d[0]),q=per[c]||{w:0,pod:0,dnf:0,ent:0};
     return `<div class="rr" style="grid-template-columns:1fr auto"><span>${d[0]}</span><span class="rt">${d[2]} pts · ${q.w} vict. · ${q.pod} pod. · ${q.dnf} aband./NC</span></div>`}).join("");
@@ -412,7 +426,7 @@ function thist(team){
   const tro=w?"🏆".repeat(Math.min(w,10))+(w>10?` <small>+${w-10}</small>`:""):"";
   const rb=(l,v)=>`<div>${l}<div class="ig-b"><i style="width:${sc(v)}%">${v}</i></div></div>`;
   const nd=DATA.drivers.filter(d=>d[1]===team).length;
-  return `<div class="pn" style="--tc:${col}">${wm("",team)}${wi(team)}<div class="ig-title">${team}</div><div class="ig-sub">${carOf("",team)?carOf("",team)+" · ":""}Saison 2026</div><div class="ig-top"><div class="av ig-ph${CQ[team]?" wi":""}" data-t="${team}" style="background-color:${col}${CPH[team]?`;background-image:url('${CPH[team]}')`:""}"><span class="ig-in">${ini(team)}</span></div><div class="ig-li"><div>Classement : <b>${ord(rk)}</b></div><div>Points : <b>${pts}</b></div><div>Pilotes : <b>${nd}</b></div><div>Départs (pilotes) : <b>${ent}</b></div><div>Meilleur résultat : <b>${best?ord(best):"–"}</b></div></div></div><div class="ig-h">Palmarès 2026</div>${tro?`<div class="ig-tr">${tro}</div>`:""}<div class="ig-p"><b>${w}</b> victoire${w>1?"s":""} · <b>${pod}</b> podium${pod>1?"s":""} (pilotes)</div><div class="ig-h">Records de la saison</div><div class="ig-rb">${rb("Victoires",w)}${rb("Podiums",pod)}${rb("Top 5",t5)}${rb("Abandons / NC",dnf)}</div><div class="ig-h">Pilotes</div>${dr}<div class="ig-h">Meilleur résultat par GP</div><div class="chs">${chips.join("")}</div><div class="lg">Or : victoire · gris : podium · ✕ : abandon ou non classé · – : absent. Barres : sur ${ent} départ${ent>1?"s":""} de pilotes. Les pilotes sont rattachés à leur équipe actuelle ; « Victoires » compte les courses gagnées par l'équipe. Photo : Wikipédia, si disponible.</div>${carBlock("c",CID[team])}</div>`;
+  return `<div class="pn" style="--tc:${col}">${wm("",team)}${wi(team)}<div class="ig-title">${team}</div><div class="ig-sub">${carOf("",team)?carOf("",team)+" · ":""}Saison 2026</div><div class="ig-top"><div class="av ig-ph${CQ[team]?" wi":""}" data-t="${team}" style="background-color:${col}${CPH[team]?`;background-image:url('${CPH[team]}')`:""}"><span class="ig-in">${ini(team)}</span></div><div class="ig-li"><div>Classement : <b>${ord(rk)}</b></div><div>Points : <b>${pts}</b></div><div>Pilotes : <b>${nd}</b></div><div>Départs (pilotes) : <b>${ent}</b></div><div>Meilleur résultat : <b>${best?ord(best):"–"}</b></div></div></div><div class="ig-h">Palmarès 2026</div>${tro?`<div class="ig-tr">${tro}</div>`:""}<div class="ig-p"><b>${w}</b> victoire${w>1?"s":""} · <b>${pod}</b> podium${pod>1?"s":""} (pilotes)</div><div class="ig-h">Records de la saison</div><div class="ig-rb">${rb("Victoires",w)}${rb("Podiums",pod)}${rb("Top 5",t5)}${rb("Abandons / NC",dnf)}</div><div class="ig-h">Pilotes</div>${dr}<div class="ig-h">Meilleur résultat par GP</div><div class="chs">${chips.join("")}</div><div class="lg">Or : victoire · gris : podium · ✕ : abandon ou non classé · – : absent · S : résultat du sprint (week-ends concernés). Barres : sur ${ent} départ${ent>1?"s":""} de pilotes. Les pilotes sont rattachés à leur équipe actuelle ; « Victoires » compte les courses gagnées par l'équipe. Photo : Wikipédia, si disponible.</div>${carBlock("c",CID[team])}</div>`;
 }
 document.getElementById("cons").addEventListener("click",e=>{
   const r=e.target.closest(".tm");if(!r||e.target.closest(".dh"))return;
