@@ -341,8 +341,10 @@ async function live(){
     const w=R.Results[0],wn=N[w.Driver.code]||fullName(w.Driver);
     rows[r-1]=[frn(R),short(R.date),wn,tname(w.Constructor.name)];
   }
-  try{const sp=await J("/sprint.json?limit=100");const o={};
-    (sp.MRData.RaceTable.Races||[]).forEach(R=>{const L=R.SprintResults||[];if(!L.length)return;const ok=[],ko=[];
+  try{const o={};const byR={};let off=0,tot=1;
+    while(off<tot&&off<2000){const sp=await J("/sprint.json?limit=100&offset="+off);tot=+sp.MRData.total||0;off+=100;
+      (sp.MRData.RaceTable.Races||[]).forEach(R=>{(byR[R.round]=byR[R.round]||{round:R.round,SprintResults:[]}).SprintResults.push(...(R.SprintResults||[]))})}
+    Object.values(byR).forEach(R=>{const L=R.SprintResults||[];if(!L.length)return;const ok=[],ko=[];
       L.forEach(x=>{const c=x.Driver.code||x.Driver.driverId.slice(0,3).toUpperCase();N[c]=N[c]||fullName(x.Driver);(/^\d+$/.test(x.positionText)?ok:ko).push(c)});
       o[+R.round-1]=ok.join(" ")+(ko.length?" | "+ko.join(" "):"")});
     Object.keys(SPR).forEach(k=>delete SPR[k]);Object.assign(SPR,o);try{localStorage.setItem("spr26",JSON.stringify(o))}catch(e){}}catch(e){}
