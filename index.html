@@ -148,9 +148,10 @@ input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--lin
 <p class="sub" id="sub"></p>
 <div class="next" id="nextbox"><span>Prochain GP : <b id="nx"></b> <span class="chev">▼</span></span><span id="nd"></span></div>
 <div id="cal" hidden></div>
-<div class="tabs"><button id="t1" class="on">Classement pilotes</button><button id="t2">Courses</button><button id="t3">Classement constructeurs</button></div>
+<div class="tabs"><button id="t1" class="on">Classement pilotes</button><button id="t4">Qualifications</button><button id="t2">Courses</button><button id="t3">Classement constructeurs</button></div>
 <div id="v1"><input id="q" type="search" placeholder="Rechercher un pilote ou une écurie…">
 <div id="list"></div></div>
+<div id="v4" hidden><div id="quals"></div></div>
 <div id="v2" hidden><div id="races"></div></div>
 <div id="v3" hidden><div id="cons"></div></div>
 <p class="foot">Chargement des données en direct…</p>
@@ -283,11 +284,22 @@ function detail(i){
   const sq=sprP(i),sh=sq?'<div class="ig-h" style="margin:10px 0 6px">Sprint</div>'+sq[0].map((c,k)=>row(c,k+1)).join("")+(sq[1]||[]).map(c=>row(c,"—")).join(""):"";
   return p[0].map((c,k)=>row(c,k+1)).join("")+(p[1]||[]).map(c=>row(c,"—")).join("")+'<div class="note">— : abandon ou non classé</div>'+sh+(NOTE[i]?'<div class="note">'+NOTE[i]+'</div>':"");
 }
+const QUAL={};
+try{Object.assign(QUAL,JSON.parse(localStorage.getItem("qual26")||"{}"))}catch(e){}
+function qHTML(){
+  const ks=Object.keys(QUAL).map(Number).sort((a,b)=>b-a);
+  if(!ks.length)return '<div class="nodet" style="padding:14px 4px">Résultats des qualifications bientôt disponibles (chargement en direct).</div>';
+  const open=[...document.querySelectorAll("#quals .race.open")].map(e=>e.dataset.i);
+  return ks.map(i=>{const q=QUAL[i],p=q.r[0],n=N[p[0]]||p[0],t=TEAM[n]||p[3]||"",c=COL[t]||"#888";
+    const rows=q.r.map((x,k)=>{const nn=N[x[0]]||x[0],tt=TEAM[nn]||x[3]||"";return `<div class="rr"><span class="rp">${k+1}</span><span class="dot" style="background:${COL[tt]||"#888"}"></span><span>${nn}${tg(tt)}</span><span class="rt">${x[1]?x[1]+" <small>"+x[2]+"</small>":"—"}</span></div>`}).join("");
+    return `<div class="race${open.includes(String(i))?" open":""}" data-i="${i}"><div class="rd">${i+1}</div><div><div class="gp">GP ${q.g}<span class="chev">▼</span></div><div class="dt">${q.d} 2026</div></div><div class="win"><span class="dot" style="background:${c};display:inline-block;margin-right:5px"></span>${n}<small>Pole · ${t}</small></div><div class="det">${rows}<div class="note">Meilleur temps de la dernière séance atteinte (Q1, Q2 ou Q3).</div></div></div>`}).join("");
+}
 function build(){
   $("sub").textContent="Après la manche "+DATA.round+"/"+TOTAL+" · "+DATA.after+" · "+DATA.date;
   $("nx").textContent=DATA.next;
   $("nd").textContent=DATA.nextDate;
   render($("q").value);
+  $("quals").innerHTML=qHTML();
   const open=[...document.querySelectorAll("#races .race.open")].map(e=>e.dataset.i);
   $("races").innerHTML=RACES.map((r,i)=>{const c=COL[r[3]]||"#888";
   return `<div class="race${open.includes(String(i))?" open":""}" data-i="${i}"><div class="rd">${i+1}</div><div><div class="gp">GP ${r[0]}${SPR[i]?'<span class="sp">S</span>':""}<span class="chev">▼</span></div><div class="dt">${r[1]} 2026</div></div><div class="win"><span class="dot" style="background:${c};display:inline-block;margin-right:5px"></span>${r[2]}<small>${r[3]}</small></div><div class="det">${detail(i)}</div></div>`}).reverse().join("");
@@ -299,8 +311,9 @@ function build(){
 }
 $("races").addEventListener("click",e=>{const r=e.target.closest(".race");if(r)r.classList.toggle("open")});
 $("nextbox").onclick=function(){const c=$("cal");c.hidden=!c.hidden;this.classList.toggle("open",!c.hidden)};
-function tab(n){["1","2","3"].forEach(k=>{$("v"+k).hidden=k!=n;$("t"+k).classList.toggle("on",k==n)})}
-["1","2","3"].forEach(k=>$("t"+k).onclick=()=>tab(k));
+function tab(n){["1","4","2","3"].forEach(k=>{$("v"+k).hidden=k!=n;$("t"+k).classList.toggle("on",k==n)})}
+["1","4","2","3"].forEach(k=>$("t"+k).onclick=()=>tab(k));
+$("quals").addEventListener("click",e=>{const r=e.target.closest(".race");if(r)r.classList.toggle("open")});
 build();
 
 /* ===== Mise à jour automatique (API Jolpica / Ergast, gratuite) ===== */
@@ -348,6 +361,15 @@ async function live(){
       L.forEach(x=>{const c=x.Driver.code||x.Driver.driverId.slice(0,3).toUpperCase();N[c]=N[c]||fullName(x.Driver);(/^\d+$/.test(x.positionText)?ok:ko).push(c)});
       o[+R.round-1]=ok.join(" ")+(ko.length?" | "+ko.join(" "):"")});
     Object.keys(SPR).forEach(k=>delete SPR[k]);Object.assign(SPR,o);try{localStorage.setItem("spr26",JSON.stringify(o))}catch(e){}}catch(e){}
+  try{const byR={};let off=0,tot=1;
+    while(off<tot&&off<2000){const qq=await J("/qualifying.json?limit=100&offset="+off);tot=+qq.MRData.total||0;off+=100;
+      (qq.MRData.RaceTable.Races||[]).forEach(R=>{const o=byR[R.round]=byR[R.round]||{R,Q:[]};o.Q.push(...(R.QualifyingResults||[]))})}
+    const o={};
+    Object.values(byR).forEach(({R,Q})=>{if(!Q.length)return;Q.sort((a,b)=>+a.position-+b.position);
+      o[+R.round-1]={g:frn(R),d:short(R.date),r:Q.map(x=>{const c=x.Driver.code||x.Driver.driverId.slice(0,3).toUpperCase();
+        N[c]=N[c]||fullName(x.Driver);TEAM[N[c]]=TEAM[N[c]]||tname(x.Constructor.name);
+        const l=x.Q3?"Q3":x.Q2?"Q2":x.Q1?"Q1":"";return [c,x.Q3||x.Q2||x.Q1||"",l,tname(x.Constructor.name)]})}});
+    if(Object.keys(o).length){Object.keys(QUAL).forEach(k=>delete QUAL[k]);Object.assign(QUAL,o);try{localStorage.setItem("qual26",JSON.stringify(o))}catch(e){}}}catch(e){}
   // pour les manches déjà connues, on garde les données intégrées
   for(let r=1;r<=round;r++){if(!rows[r-1])rows[r-1]=RACES[r-1]}
   drivers.forEach(d=>TEAM[d[0]]=d[1]);
